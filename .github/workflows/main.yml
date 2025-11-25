@@ -1,27 +1,46 @@
-import path from 'path';
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+name: Deploy to GitHub Pages
 
-export default defineConfig({
-  base: '/vitejs-vite-f8fjykpb/',
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
-  plugins: [react()],
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
-  },
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
-  resolve: {
-    alias: {
-      // modification 2: 规范化 alias
-      // 通常 @ 都是指向 src 目录的，这样写更标准
-      '@': path.resolve(__dirname, './src'),
-    }
-  },
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
 
-  // modification 3: 删除了 define 和 loadEnv 部分
-  // 原因：Vite 原生支持 .env 文件，不需要手动解析。
-  // 只要你的变量名以 VITE_ 开头（比如 VITE_API_KEY），
-  // 在代码里直接用 import.meta.env.VITE_API_KEY 就能取到。
-});
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
